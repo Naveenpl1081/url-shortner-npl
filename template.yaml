@@ -1,0 +1,104 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: URL Shortener API using AWS SAM
+
+Globals:
+  Function:
+    Runtime: nodejs24.x
+    Timeout: 5
+    MemorySize: 128
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref UrlTable
+        ORIGINAL_URL_INDEX: 'OriginalUrlIndex'
+
+Resources:
+  UrlShortenerApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: UrlShortenerApi
+      StageName: test
+      EndpointConfiguration:
+        Type: REGIONAL
+      Cors:
+        AllowMethods: "'GET,POST'"
+        AllowHeaders: "'Content-Type'"
+        AllowOrigin: "'*'"
+
+  UrlTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: UrlTableNpl 
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: shortId
+          AttributeType: S
+        - AttributeName: originalUrl
+          AttributeType: S
+      KeySchema:
+        - AttributeName: shortId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: OriginalUrlIndex
+          KeySchema:
+            - AttributeName: originalUrl
+              KeyType: HASH
+          Projection:
+            ProjectionType: KEYS_ONLY
+
+  CreateShortUrlFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: createUrl.handler
+      CodeUri: ./ 
+      FunctionName: CreateShortUrlFunction
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref UrlTable
+        - DynamoDBWritePolicy:
+            TableName: !Ref UrlTable
+      Events:
+        CreateEndpoint:
+          Type: Api
+          Properties:
+            RestApiId: !Ref UrlShortenerApi
+            Path: /get-url-shortner
+            Method: POST
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints: 
+          - src/functions/createUrl.ts
+
+  RedirectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: redirectUrl.handler
+      CodeUri: ./ 
+      FunctionName: RedirectFunction
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref UrlTable
+      Events:
+        RedirectEndpoint:
+          Type: Api
+          Properties:
+            RestApiId: !Ref UrlShortenerApi
+            Path: /short/{shortId}
+            Method: GET
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints: 
+          - src/functions/redirectUrl.ts
+
+Outputs:
+  ApiUrl:
+    Description: "Base URL for API"
+    Value: !Sub 'https://${UrlShortenerApi}.execute-api.${AWS::Region}.amazonaws.com/test/'
