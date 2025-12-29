@@ -16,7 +16,7 @@ Resources:
   UrlShortenerApi:
     Type: AWS::Serverless::Api
     Properties:
-      Name: UrlShortenerApi
+      Name: UrlShortenerApi-CICD
       StageName: test
       EndpointConfiguration:
         Type: REGIONAL
@@ -28,7 +28,7 @@ Resources:
   UrlTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: UrlTableNpl-CI-CD 
+      TableName: UrlTableNpl-CI-CD
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: shortId
@@ -51,7 +51,7 @@ Resources:
     Properties:
       Handler: createUrl.handler
       CodeUri: ./ 
-      FunctionName: CreateShortUrlFunction
+      FunctionName: CreateShortUrlFunction-CICD
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref UrlTable
@@ -78,7 +78,7 @@ Resources:
     Properties:
       Handler: redirectUrl.handler
       CodeUri: ./ 
-      FunctionName: RedirectFunction
+      FunctionName: RedirectFunction-CICD
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref UrlTable
