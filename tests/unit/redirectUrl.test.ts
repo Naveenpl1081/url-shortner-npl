@@ -1,22 +1,30 @@
-import { describe, it, expect, beforeEach } from "@jest/globals";
+
+import { describe, it, expect, beforeEach, beforeAll, afterAll, jest } from "@jest/globals";
 import { APIGatewayProxyEvent } from "aws-lambda";
-import { handler } from "../../src/functions/redirectUrl";
-import { ddbMock, resetMocks, mockDynamoDBError } from "../mocks/aws-sdk.mock";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
+import { ddbMock, resetMocks, mockDynamoDBError } from "../mocks/aws-sdk.mock";
+import * as validator from '../../src/utils/validator';
+
+// Import the handler AFTER mocks are set up
+import { handler } from "../../src/functions/redirectUrl";
+
+let consoleErrorSpy: jest.SpiedFunction<typeof console.error>;
 
 beforeAll(() => {
-  jest.spyOn(console, "error").mockImplementation(() => {});
+  consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
 });
 
 afterAll(() => {
-  (console.error as jest.Mock).mockRestore();
+  consoleErrorSpy.mockRestore();
 });
 
+// Set env var before importing
 process.env.TABLE_NAME = "TestTable";
 
 describe("redirectUrl Lambda Function", () => {
   beforeEach(() => {
     resetMocks();
+    jest.clearAllMocks();
   });
 
   const createEvent = (shortId: string): APIGatewayProxyEvent =>
@@ -38,7 +46,7 @@ describe("redirectUrl Lambda Function", () => {
 
       expect(response.statusCode).toBe(301);
       expect(response.headers).toBeDefined();
-      expect(response.headers!["Location"]).toBe("https://example.com"); // Added !
+      expect(response.headers!["Location"]).toBe("https://example.com");
       expect(response.body).toBe("");
     });
   });
@@ -53,8 +61,15 @@ describe("redirectUrl Lambda Function", () => {
       expect(body.error).toContain("Short ID is required");
     });
 
+    it("should return 400 for undefined pathParameters", async () => {
+      const event = {} as any;
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(400);
+    });
+
     it("should return 400 for invalid shortId format", async () => {
-      const event = createEvent("ab"); // Too short
+      const event = createEvent("ab");
       const response = await handler(event);
 
       expect(response.statusCode).toBe(400);
@@ -65,6 +80,32 @@ describe("redirectUrl Lambda Function", () => {
       const response = await handler(event);
 
       expect(response.statusCode).toBe(400);
+    });
+
+    it("should return 400 for empty shortId", async () => {
+      const event = createEvent("");
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("should return 400 for whitespace only shortId", async () => {
+      const event = createEvent("   ");
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('should handle non-ValidationError and re-throw to outer catch', async () => {
+      jest.spyOn(validator, 'validateShortId').mockImplementationOnce(() => {
+        throw new Error('Unexpected system error');
+      });
+
+      const event = createEvent("test123");
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(500);
+      expect(JSON.parse(response.body).error).toContain('Internal server error');
     });
   });
 
@@ -82,7 +123,7 @@ describe("redirectUrl Lambda Function", () => {
 
     it("should return 500 for invalid data in database", async () => {
       ddbMock.on(GetCommand).resolves({
-        Item: { shortId: "test123" }, // Missing originalUrl
+        Item: { shortId: "test123" },
       });
 
       const event = createEvent("test123");
@@ -91,6 +132,17 @@ describe("redirectUrl Lambda Function", () => {
       expect(response.statusCode).toBe(500);
       const body = JSON.parse(response.body);
       expect(body.error).toContain("Invalid URL data");
+    });
+
+    it("should return 500 for non-string originalUrl", async () => {
+      ddbMock.on(GetCommand).resolves({
+        Item: { shortId: "test123", originalUrl: 123 },
+      });
+
+      const event = createEvent("test123");
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(500);
     });
   });
 
@@ -115,6 +167,15 @@ describe("redirectUrl Lambda Function", () => {
 
     it("should handle generic errors", async () => {
       mockDynamoDBError("UnknownError");
+
+      const event = createEvent("test123");
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(500);
+    });
+
+    it('should handle non-Error exceptions', async () => {
+      ddbMock.on(GetCommand).rejects('String error');
 
       const event = createEvent("test123");
       const response = await handler(event);

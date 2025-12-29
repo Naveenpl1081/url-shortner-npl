@@ -1,23 +1,28 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll, jest } from '@jest/globals';
 import { APIGatewayProxyEvent } from 'aws-lambda';
-import { handler } from '../../src/functions/createUrl';
+import { QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { ddbMock, resetMocks, mockDynamoDBSuccess, mockExistingUrl, mockDynamoDBError } from '../mocks/aws-sdk.mock';
+import * as validator from '../../src/utils/validator';
 
-
+// Mock nanoid
 jest.mock('nanoid', () => ({
   nanoid: jest.fn(() => 'test1234'),
 }));
 
+// Import the handler AFTER mocks are set up
+import { handler } from '../../src/functions/createUrl';
+
+let consoleErrorSpy: jest.SpiedFunction<typeof console.error>;
 
 beforeAll(() => {
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 });
 
 afterAll(() => {
-  (console.error as jest.Mock).mockRestore();
+  consoleErrorSpy.mockRestore();
 });
 
-
+// Set env vars before importing
 process.env.TABLE_NAME = 'TestTable';
 process.env.ORIGINAL_URL_INDEX = 'TestIndex';
 
@@ -63,6 +68,28 @@ describe('createUrl Lambda Function', () => {
       expect(body.data.message).toBe('URL already exists');
     });
 
+    it('should handle when QueryCommand returns empty Items array', async () => {
+      ddbMock.on(QueryCommand).resolves({ Items: [] });
+      mockDynamoDBSuccess();
+
+      const event = createEvent({ url: 'https://newurl.com' });
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(201);
+      const body = JSON.parse(response.body);
+      expect(body.data.shortId).toBe('test1234');
+    });
+
+    it('should handle when QueryCommand returns undefined Items', async () => {
+      ddbMock.on(QueryCommand).resolves({ Items: undefined });
+      mockDynamoDBSuccess();
+
+      const event = createEvent({ url: 'https://anotherurl.com' });
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(201);
+    });
+
     it('should sanitize URL with whitespace', async () => {
       mockDynamoDBSuccess();
 
@@ -90,6 +117,31 @@ describe('createUrl Lambda Function', () => {
       expect(body.error).toContain('Invalid JSON');
     });
 
+    it('should handle null body', async () => {
+      const event = {
+        body: null,
+        requestContext: { domainName: 'test', stage: 'test' },
+      } as any;
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(400);
+      const body = JSON.parse(response.body);
+      expect(body.error).toContain('required');
+    });
+
+    it('should handle undefined body', async () => {
+      const event = {
+        requestContext: { domainName: 'test', stage: 'test' },
+      } as any;
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(400);
+      const body = JSON.parse(response.body);
+      expect(body.error).toContain('required');
+    });
+
     it('should return 400 for missing URL', async () => {
       const event = createEvent({});
       const response = await handler(event);
@@ -104,6 +156,15 @@ describe('createUrl Lambda Function', () => {
       const response = await handler(event);
 
       expect(response.statusCode).toBe(400);
+    });
+
+    it('should return 400 for whitespace only URL', async () => {
+      const event = createEvent({ url: '   ' });
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(400);
+      const body = JSON.parse(response.body);
+      expect(body.error).toContain('empty');
     });
 
     it('should return 400 for invalid URL format', async () => {
@@ -128,6 +189,18 @@ describe('createUrl Lambda Function', () => {
       const response = await handler(event);
 
       expect(response.statusCode).toBe(400);
+    });
+
+    it('should handle non-ValidationError and re-throw to outer catch', async () => {
+      jest.spyOn(validator, 'validateUrl').mockImplementationOnce(() => {
+        throw new Error('Unexpected system error');
+      });
+
+      const event = createEvent({ url: 'https://example.com' });
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(500);
+      expect(JSON.parse(response.body).error).toContain('Internal server error');
     });
   });
 
@@ -163,6 +236,27 @@ describe('createUrl Lambda Function', () => {
       expect(response.statusCode).toBe(500);
       const body = JSON.parse(response.body);
       expect(body.error).toContain('Internal server error');
+    });
+
+    it('should handle non-Error exceptions', async () => {
+      ddbMock.on(QueryCommand).rejects('String error');
+
+      const event = createEvent({ url: 'https://example.com' });
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(500);
+    });
+
+    it('should handle errors that are not Error instances', async () => {
+      ddbMock.on(QueryCommand).callsFake(() => {
+        throw { message: 'Not an Error instance' };
+      });
+
+      const event = createEvent({ url: 'https://example.com' });
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(500);
+      expect(JSON.parse(response.body).error).toContain('Internal server error');
     });
   });
 });

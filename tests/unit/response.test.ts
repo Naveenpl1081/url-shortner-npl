@@ -1,9 +1,61 @@
 import { describe, it, expect } from '@jest/globals';
-import { successResponse, errorResponse, redirectResponse } from '../../src/utils/response';
+import { successResponse, errorResponse, redirectResponse, formatResponse } from '../../src/utils/response';
 
 describe('Response Utils', () => {
+  describe('formatResponse', () => {
+    it('should format response with data', () => {
+      const response = formatResponse({
+        statusCode: 200,
+        data: { message: 'Success' }
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.body)).toEqual({
+        success: true,
+        data: { message: 'Success' }
+      });
+      expect(response.headers).toBeDefined();
+      expect(response.headers!['Content-Type']).toBe('application/json');
+    });
+
+    it('should format response with error', () => {
+      const response = formatResponse({
+        statusCode: 404,
+        error: 'Not found'
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(JSON.parse(response.body)).toEqual({
+        success: false,
+        error: 'Not found'
+      });
+    });
+
+    it('should merge custom headers with default headers', () => {
+      const response = formatResponse({
+        statusCode: 200,
+        data: { test: 'data' },
+        headers: { 'X-Custom-Header': 'custom-value' }
+      });
+
+      expect(response.headers!['Content-Type']).toBe('application/json');
+      expect(response.headers!['X-Custom-Header']).toBe('custom-value');
+      expect(response.headers!['Access-Control-Allow-Origin']).toBe('*');
+    });
+
+    it('should override default headers with custom headers', () => {
+      const response = formatResponse({
+        statusCode: 200,
+        data: { test: 'data' },
+        headers: { 'Content-Type': 'text/plain' }
+      });
+
+      expect(response.headers!['Content-Type']).toBe('text/plain');
+    });
+  });
+
   describe('successResponse', () => {
-    test('should return success response with default status 200', () => {
+    it('should return success response with default status 200', () => {
       const data = { message: 'Success' };
       const response = successResponse(data);
 
@@ -26,6 +78,14 @@ describe('Response Utils', () => {
         success: true,
         data,
       });
+    });
+
+    it('should include all CORS headers', () => {
+      const response = successResponse({ test: 'data' });
+
+      expect(response.headers!['Access-Control-Allow-Origin']).toBe('*');
+      expect(response.headers!['Access-Control-Allow-Headers']).toBe('Content-Type');
+      expect(response.headers!['Access-Control-Allow-Methods']).toBe('GET,POST,OPTIONS');
     });
   });
 
@@ -51,6 +111,14 @@ describe('Response Utils', () => {
         error,
       });
     });
+
+    it('should include all CORS headers', () => {
+      const response = errorResponse('Error message');
+
+      expect(response.headers!['Access-Control-Allow-Origin']).toBe('*');
+      expect(response.headers!['Access-Control-Allow-Headers']).toBe('Content-Type');
+      expect(response.headers!['Access-Control-Allow-Methods']).toBe('GET,POST,OPTIONS');
+    });
   });
 
   describe('redirectResponse', () => {
@@ -63,6 +131,14 @@ describe('Response Utils', () => {
       expect(response.headers).toBeDefined();
       expect(response.headers!['Location']).toBe(url);
       expect(response.headers!['Access-Control-Allow-Origin']).toBe('*');
+    });
+
+    it('should redirect to different URLs', () => {
+      const url = 'https://different-domain.com/path';
+      const response = redirectResponse(url);
+
+      expect(response.statusCode).toBe(301);
+      expect(response.headers!['Location']).toBe(url);
     });
   });
 });
