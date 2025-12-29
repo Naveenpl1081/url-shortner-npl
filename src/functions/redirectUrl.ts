@@ -1,8 +1,9 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand } from '@aws-sdk/lib-dynamodb';
-import { errorResponse, redirectResponse } from '../utils/response';
-import { validateShortId, ValidationError } from '../utils/validator';
+import { validateShortId, ValidationError } from '../utils/validator.js';
+import { errorResponse, redirectResponse } from '../utils/response.js';
+
 
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);

@@ -11,6 +11,7 @@ Globals:
       Variables:
         TABLE_NAME: !Ref UrlTable
         ORIGINAL_URL_INDEX: 'OriginalUrlIndex'
+        JWT_SECRET: my-super-secret-key
 
 Resources:
   UrlShortenerApi:
@@ -50,7 +51,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: createUrl.handler
-      CodeUri: ./ 
+      CodeUri: ./
       FunctionName: CreateShortUrlFunction-CICD
       Policies:
         - DynamoDBReadPolicy:
@@ -68,18 +69,18 @@ Resources:
       BuildMethod: esbuild
       BuildProperties:
         Minify: true
-        Target: "es2020"
+        Target: 'es2020'
         Sourcemap: true
         External:
           - '@aws-sdk/*'
-        EntryPoints: 
+        EntryPoints:
           - src/functions/createUrl.ts
 
   RedirectFunction:
     Type: AWS::Serverless::Function
     Properties:
       Handler: redirectUrl.handler
-      CodeUri: ./ 
+      CodeUri: ./
       FunctionName: RedirectFunction-CICD
       Policies:
         - DynamoDBReadPolicy:
@@ -95,14 +96,27 @@ Resources:
       BuildMethod: esbuild
       BuildProperties:
         Minify: true
-        Target: "es2020"
+        Target: 'es2020'
         Sourcemap: true
         External:
           - '@aws-sdk/*'
-        EntryPoints: 
+        EntryPoints:
           - src/functions/redirectUrl.ts
+
+  LoginFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: login.handler
+      CodeUri: ./
+      Events:
+        LoginApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref UrlShortenerApi
+            Path: /login
+            Method: POST
 
 Outputs:
   ApiUrl:
-    Description: "Base URL for API"
+    Description: Base URL for API
     Value: !Sub 'https://${UrlShortenerApi}.execute-api.${AWS::Region}.amazonaws.com/test/'

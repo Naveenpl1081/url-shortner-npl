@@ -1,9 +1,11 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import 'nanoid';
+import { sanitizeUrl, validateUrl, ValidationError } from '../utils/validator.js';
+import { errorResponse, successResponse } from '../utils/response.js';
 import { nanoid } from 'nanoid';
-import { successResponse, errorResponse } from '../utils/response';
-import { validateUrl, sanitizeUrl, ValidationError } from '../utils/validator';
+
 
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
