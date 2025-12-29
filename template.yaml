@@ -28,7 +28,7 @@ Resources:
   UrlTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: UrlTableNpl 
+      TableName: UrlTableNpl-CI-CD 
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: shortId
