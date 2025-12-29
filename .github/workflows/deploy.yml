@@ -56,7 +56,7 @@ jobs:
       - name: Get API URL
         run: |
           API_URL=$(aws cloudformation describe-stacks \
-            --stack-name url-shortener-stack \
+            --stack-name url-shortener-stack-cicd \
             --query 'Stacks[0].Outputs[?OutputKey==`ApiUrl`].OutputValue' \
             --output text)
           echo "API URL: $API_URL"
@@ -69,4 +69,4 @@ jobs:
           echo "**API URL:** ${{ env.API_URL }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Region:** ${{ secrets.AWS_REGION }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Stack:** url-shortener-stack" >> $GITHUB_STEP_SUMMARY
+          echo "**Stack:** url-shortener-stack-cicd" >> $GITHUB_STEP_SUMMARY
