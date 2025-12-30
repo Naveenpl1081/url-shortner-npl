@@ -1,37 +1,48 @@
-name: Deploy SAM Application
+name: Deploy SAM Application (PROD)
 
 on:
-  push:
+  pull_request:
     branches:
       - main
+    types:
+      - closed  
 
 jobs:
   deploy:
+   
+    if: github.event.pull_request.merged == true
+
     runs-on: ubuntu-latest
-    
+
     steps:
+     
       - name: Checkout code
         uses: actions/checkout@v4
 
+     
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
+     
       - name: Install dependencies
         run: npm ci
 
+    
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
+    
       - name: Setup AWS SAM CLI
         uses: aws-actions/setup-sam@v2
         with:
           use-installer: true
 
+     
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -39,34 +50,34 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+    
       - name: Build SAM application
         run: sam build --use-container
 
-      - name: Deploy SAM application
+     
+      - name: Deploy SAM application (PROD)
         run: |
           sam deploy \
+            --config-env prod \
             --no-confirm-changeset \
-            --no-fail-on-empty-changeset \
-            --stack-name url-shortener-stack-cicd \
-            --capabilities CAPABILITY_IAM \
-            --resolve-s3
-        env:
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+            --no-fail-on-empty-changeset
 
+    
       - name: Get API URL
         run: |
           API_URL=$(aws cloudformation describe-stacks \
-            --stack-name url-shortener-stack-cicd \
+            --stack-name url-shortenernpl-prod \
             --query 'Stacks[0].Outputs[?OutputKey==`ApiUrl`].OutputValue' \
             --output text)
-          echo "API URL: $API_URL"
-          echo "API_URL=$API_URL" >> $GITHUB_ENV
 
+          echo "API_URL=$API_URL" >> $GITHUB_ENV
+          echo "API URL: $API_URL"
+
+    
       - name: Deployment Summary
         run: |
-          echo "## Deployment Successful! 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Production Deployment Successful" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**API URL:** ${{ env.API_URL }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Region:** ${{ secrets.AWS_REGION }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Stack:** url-shortener-stack-cicd" >> $GITHUB_STEP_SUMMARY
+          echo "**Stack:** url-shortenernpl-prod" >> $GITHUB_STEP_SUMMARY
