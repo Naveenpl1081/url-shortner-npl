@@ -2,6 +2,34 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: URL Shortener API using AWS SAM
 
+Parameters:
+  EnvName:
+    Type: String
+    AllowedValues:
+      - dev
+      - prod
+    Default: dev
+
+  JwtSecret:
+    Type: String
+    NoEcho: true
+
+  UrlTableName:
+    Type: String
+
+  UsersTableName:
+    Type: String
+
+  ApiName:
+    Type: String
+
+  StageName:
+    Type: String
+
+  OriginalUrlIndexName:
+    Type: String
+    Default: OriginalUrlIndex
+
 Globals:
   Function:
     Runtime: nodejs24.x
@@ -9,15 +37,14 @@ Globals:
     MemorySize: 128
     Environment:
       Variables:
-        JWT_SECRET: my-super-secret-key
-
+        JWT_SECRET: !Ref JwtSecret
 
 Resources:
   UrlShortenerApi:
     Type: AWS::Serverless::Api
     Properties:
-      Name: UrlShortenerApi-CICD
-      StageName: test
+      Name: !Ref ApiName
+      StageName: !Ref StageName
       EndpointConfiguration:
         Type: REGIONAL
       Cors:
@@ -34,7 +61,7 @@ Resources:
   UrlTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: UrlTableNpl-CI-CD
+      TableName: !Ref UrlTableName
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: shortId
@@ -45,7 +72,7 @@ Resources:
         - AttributeName: shortId
           KeyType: HASH
       GlobalSecondaryIndexes:
-        - IndexName: OriginalUrlIndex
+        - IndexName: !Ref OriginalUrlIndexName
           KeySchema:
             - AttributeName: originalUrl
               KeyType: HASH
@@ -55,7 +82,7 @@ Resources:
   UsersTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: UsersTable
+      TableName: !Ref UsersTableName
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: userId
@@ -73,12 +100,12 @@ Resources:
           Projection:
             ProjectionType: ALL
 
-
   JwtAuthorizerFunction:
     Type: AWS::Serverless::Function
     Properties:
       Handler: jwtAuthorizer.handler
       CodeUri: ./
+      FunctionName: !Sub "JwtAuthorizer-${EnvName}"
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
@@ -90,20 +117,18 @@ Resources:
         EntryPoints:
           - src/authorizers/jwtAuthorizer.ts
 
-
   LoginFunction:
     Type: AWS::Serverless::Function
     Properties:
       Handler: login.handler
       CodeUri: ./
+      FunctionName: !Sub "Login-${EnvName}"
       Environment:
         Variables:
-          USERS_TABLE: !Ref UsersTable
+          USERS_TABLE: !Ref UsersTableName
       Policies:
-        - DynamoDBReadPolicy:
-            TableName: !Ref UsersTable
-        - DynamoDBWritePolicy:
-            TableName: !Ref UsersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTableName
       Events:
         LoginApi:
           Type: Api
@@ -127,14 +152,13 @@ Resources:
     Properties:
       Handler: register.handler
       CodeUri: ./
+      FunctionName: !Sub "Register-${EnvName}"
       Environment:
         Variables:
-          USERS_TABLE: !Ref UsersTable
+          USERS_TABLE: !Ref UsersTableName
       Policies:
-        - DynamoDBReadPolicy:
-            TableName: !Ref UsersTable
-        - DynamoDBWritePolicy:
-            TableName: !Ref UsersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTableName
       Events:
         RegisterApi:
           Type: Api
@@ -153,22 +177,19 @@ Resources:
         EntryPoints:
           - src/functions/register.ts
 
-
   CreateShortUrlFunction:
     Type: AWS::Serverless::Function
     Properties:
       Handler: createUrl.handler
       CodeUri: ./
-      FunctionName: CreateShortUrlFunction-CICD
+      FunctionName: !Sub "CreateShortUrl-${EnvName}"
       Environment:
         Variables:
-          TABLE_NAME: !Ref UrlTable
-          ORIGINAL_URL_INDEX: OriginalUrlIndex
+          TABLE_NAME: !Ref UrlTableName
+          ORIGINAL_URL_INDEX: !Ref OriginalUrlIndexName
       Policies:
-        - DynamoDBReadPolicy:
-            TableName: !Ref UrlTable
-        - DynamoDBWritePolicy:
-            TableName: !Ref UrlTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UrlTableName
       Events:
         CreateEndpoint:
           Type: Api
@@ -194,10 +215,10 @@ Resources:
     Properties:
       Handler: redirectUrl.handler
       CodeUri: ./
-      FunctionName: RedirectFunction-CICD
+      FunctionName: !Sub "Redirect-${EnvName}"
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref UrlTable
+            TableName: !Ref UrlTableName
       Events:
         RedirectEndpoint:
           Type: Api
@@ -216,8 +237,7 @@ Resources:
         EntryPoints:
           - src/functions/redirectUrl.ts
 
-
 Outputs:
   ApiUrl:
     Description: Base URL for API
-    Value: !Sub 'https://${UrlShortenerApi}.execute-api.${AWS::Region}.amazonaws.com/test/'
+    Value: !Sub "https://${UrlShortenerApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}/"
