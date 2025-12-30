@@ -14,3 +14,15 @@ image_repositories = []
 
 [prod.global.parameters]
 region = "ap-south-1"
+
+[dev.deploy.parameters]
+stack_name = "url-shortenernpl-dev"
+resolve_s3 = true
+s3_prefix = "url-shortenernpl-dev"
+region = "ap-south-1"
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "EnvName=\"dev\" UrlTableName=\"UrlTable-dev\" UsersTableName=\"UsersTable-dev\" ApiName=\"UrlShortenerApi-dev\" StageName=\"dev\" OriginalUrlIndexName=\"OriginalUrlIndex\""
+image_repositories = []
+
+[dev.global.parameters]
+region = "ap-south-1"
