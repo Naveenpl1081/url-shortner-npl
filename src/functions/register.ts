@@ -5,7 +5,7 @@ import {
   PutCommand,
   QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
-import argon2 from "argon2";
+import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
 
 const client = new DynamoDBClient({});
@@ -25,7 +25,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       };
     }
 
-   
+    // 1️⃣ Check if email already exists
     const existingUser = await docClient.send(
       new QueryCommand({
         TableName: USERS_TABLE,
@@ -37,24 +37,20 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       })
     );
 
-    if (existingUser.Count && existingUser.Count > 0) {
+    if (existingUser.Items && existingUser.Items.length > 0) {
       return {
         statusCode: 409,
         body: JSON.stringify({ message: "Email already registered" }),
       };
     }
 
-    
-    const passwordHash = await argon2.hash(password, {
-      type: argon2.argon2id, 
-      memoryCost: 2 ** 16,    
-      timeCost: 3,
-      parallelism: 1,
-    });
+    // 2️⃣ Hash password using bcryptjs
+    const SALT_ROUNDS = 10;
+    const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
     const userId = `USER#${uuidv4()}`;
 
-  
+    // 3️⃣ Save user to DynamoDB
     await docClient.send(
       new PutCommand({
         TableName: USERS_TABLE,
@@ -75,7 +71,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       }),
     };
   } catch (error) {
-    console.error("Register error:", error);
+    console.error("REGISTER_ERROR", error);
     return {
       statusCode: 500,
       body: JSON.stringify({ message: "Internal server error" }),
