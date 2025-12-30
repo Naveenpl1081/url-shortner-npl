@@ -11,7 +11,7 @@ This project allows users to generate a short URL for a long URL and redirect ba
 - Redirect short URL → original URL
 - Input validation and error handling
 - Uses DynamoDB for fast and scalable storage
-- Fully serverless (no servers to manage)
+- Fully serverless no servers to manage
 - Written in **TypeScript**
 - Unit tested using **Jest**
 
