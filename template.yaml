@@ -96,6 +96,14 @@ Resources:
     Properties:
       Handler: login.handler
       CodeUri: ./
+      Environment:
+        Variables:
+          USERS_TABLE: !Ref UsersTable
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref UsersTable
+        - DynamoDBWritePolicy:
+            TableName: !Ref UsersTable
       Events:
         LoginApi:
           Type: Api
