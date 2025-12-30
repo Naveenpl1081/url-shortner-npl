@@ -9,9 +9,8 @@ Globals:
     MemorySize: 128
     Environment:
       Variables:
-        TABLE_NAME: !Ref UrlTable
-        ORIGINAL_URL_INDEX: 'OriginalUrlIndex'
         JWT_SECRET: my-super-secret-key
+
 
 Resources:
   UrlShortenerApi:
@@ -23,8 +22,14 @@ Resources:
         Type: REGIONAL
       Cors:
         AllowMethods: "'GET,POST'"
-        AllowHeaders: "'Content-Type'"
+        AllowHeaders: "'Content-Type,Authorization'"
         AllowOrigin: "'*'"
+      Auth:
+        Authorizers:
+          JwtAuthorizer:
+            FunctionArn: !GetAtt JwtAuthorizerFunction.Arn
+            Identity:
+              Header: Authorization
 
   UrlTable:
     Type: AWS::DynamoDB::Table
@@ -47,12 +52,110 @@ Resources:
           Projection:
             ProjectionType: KEYS_ONLY
 
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: UsersTable
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: email
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: EmailIndex
+          KeySchema:
+            - AttributeName: email
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+
+  JwtAuthorizerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: jwtAuthorizer.handler
+      CodeUri: ./
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2020
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+        EntryPoints:
+          - src/authorizers/jwtAuthorizer.ts
+
+
+  LoginFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: login.handler
+      CodeUri: ./
+      Events:
+        LoginApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref UrlShortenerApi
+            Path: /login
+            Method: POST
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2020
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+        EntryPoints:
+          - src/functions/login.ts
+
+  RegisterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: register.handler
+      CodeUri: ./
+      Environment:
+        Variables:
+          USERS_TABLE: !Ref UsersTable
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref UsersTable
+        - DynamoDBWritePolicy:
+            TableName: !Ref UsersTable
+      Events:
+        RegisterApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref UrlShortenerApi
+            Path: /register
+            Method: POST
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2020
+        Sourcemap: true
+        External:
+          - '@aws-sdk/*'
+        EntryPoints:
+          - src/functions/register.ts
+
+
   CreateShortUrlFunction:
     Type: AWS::Serverless::Function
     Properties:
       Handler: createUrl.handler
       CodeUri: ./
       FunctionName: CreateShortUrlFunction-CICD
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref UrlTable
+          ORIGINAL_URL_INDEX: OriginalUrlIndex
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref UrlTable
@@ -65,11 +168,13 @@ Resources:
             RestApiId: !Ref UrlShortenerApi
             Path: /get-url-shortner
             Method: POST
+            Auth:
+              Authorizer: JwtAuthorizer
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
         Minify: true
-        Target: 'es2020'
+        Target: es2020
         Sourcemap: true
         External:
           - '@aws-sdk/*'
@@ -96,25 +201,13 @@ Resources:
       BuildMethod: esbuild
       BuildProperties:
         Minify: true
-        Target: 'es2020'
+        Target: es2020
         Sourcemap: true
         External:
           - '@aws-sdk/*'
         EntryPoints:
           - src/functions/redirectUrl.ts
 
-  LoginFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: login.handler
-      CodeUri: ./
-      Events:
-        LoginApi:
-          Type: Api
-          Properties:
-            RestApiId: !Ref UrlShortenerApi
-            Path: /login
-            Method: POST
 
 Outputs:
   ApiUrl:

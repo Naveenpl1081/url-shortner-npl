@@ -27,8 +27,10 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "argon2": "^0.44.0",
     "esbuild": "^0.27.2",
     "jsonwebtoken": "^9.0.3",
-    "nanoid": "^5.1.6"
+    "nanoid": "^5.1.6",
+    "uuid": "^13.0.0"
   }
 }
