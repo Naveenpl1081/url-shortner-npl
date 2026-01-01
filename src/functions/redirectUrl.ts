@@ -1,13 +1,18 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand } from '@aws-sdk/lib-dynamodb';
-import { validateShortId, ValidationError } from '../utils/validator.js';
-import { errorResponse, redirectResponse } from '../utils/response.js';
+import { validateShortId, ValidationError } from '../utils/validator.ts';
+import { errorResponse, redirectResponse } from '../utils/response.ts';
 
 
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
-const TABLE_NAME = process.env.TABLE_NAME || '';
+const TABLE_NAME = process.env.TABLE_NAME;
+
+if(!TABLE_NAME) {
+  console.error("TABLE_NAME is not defined");
+  throw new Error("TABLE_NAME is not defined");
+}
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   try {

@@ -216,6 +216,10 @@ Resources:
       Handler: redirectUrl.handler
       CodeUri: ./
       FunctionName: !Sub "Redirect-${EnvName}"
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref UrlTableName
+          ORIGINAL_URL_INDEX: !Ref OriginalUrlIndexName
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref UrlTableName
