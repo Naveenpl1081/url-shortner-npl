@@ -2,8 +2,8 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import 'nanoid';
-import { sanitizeUrl, validateUrl, ValidationError } from '../utils/validator.js';
-import { errorResponse, successResponse } from '../utils/response.js';
+import { sanitizeUrl, validateUrl, ValidationError } from '../utils/validator.ts';
+import { errorResponse, successResponse } from '../utils/response.ts';
 import { nanoid } from 'nanoid';
 
 
@@ -87,7 +87,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
   } catch (error) {
     console.error('Error creating short URL:', error);
 
-    // Handle specific AWS errors
+    
     if (error instanceof Error) {
       if (error.name === 'ResourceNotFoundException') {
         return errorResponse('Database table not found', 503);

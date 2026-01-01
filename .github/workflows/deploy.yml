@@ -76,7 +76,7 @@ jobs:
     
       - name: Deployment Summary
         run: |
-          echo "## 🚀 Production Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          echo "## Production Deployment Successful" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**API URL:** ${{ env.API_URL }}" >> $GITHUB_STEP_SUMMARY
           echo "**Region:** ${{ secrets.AWS_REGION }}" >> $GITHUB_STEP_SUMMARY
