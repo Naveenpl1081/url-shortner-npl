@@ -105,7 +105,7 @@ describe("login Lambda Function", () => {
           role: "admin"
         },
         TEST_JWT_SECRET,
-        { expiresIn: "1h" }
+        { expiresIn: "7d" }
       );
     });
   });
