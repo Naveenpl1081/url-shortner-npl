@@ -14,6 +14,8 @@ const ORIGINAL_URL_INDEX = process.env.ORIGINAL_URL_INDEX || '';
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   try {
+    console.log("reached")
+    console.log("events",event)
   
     let body;
     try {
